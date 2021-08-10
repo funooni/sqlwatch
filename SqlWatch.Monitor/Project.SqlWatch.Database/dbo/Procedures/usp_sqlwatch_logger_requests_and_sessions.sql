@@ -29,7 +29,7 @@ as
 		, 'background' = sum(case status when 'Background' then 1 else 0 end)
 		-- exclude our own session from counting. This way, if there are no other sessions we can still get a count that shows 0
 		-- if we excluded it in the where clause, we would have had a missing for this snapshot time which would have upset dashboards
-		, 'running' = sum(case when status = 'Running' and session_id <> @@SPID then 1 else 0 end)
+		, 'running' = sum(case when status = 'Running' and r.session_id <> @@SPID then 1 else 0 end)
 		, 'runnable' = sum(case status when 'Runnable' then 1 else 0 end)
 		, 'sleeping' = sum(case status when 'Sleeping' then 1 else 0 end)
 		, 'suspended' = sum(case status when 'Suspended' then 1 else 0 end)
@@ -46,6 +46,7 @@ as
 		select type = case when t.session_id > 50 then 1 else 0 end
 			, waiting_tasks = count(*)
 			, wait_duration_ms = sum(wait_duration_ms)
+			, t.session_id
 		from sys.dm_os_waiting_tasks t (nolock)
 		where wait_type collate database_default not in (
 			select wait_type 
@@ -53,9 +54,10 @@ as
 			) 
 		and session_id is not null 
 		group by case when t.session_id > 50 then 1 else 0 end
-	
+		, t.session_id
 	) t
 	on t.type = case when r.session_id > 50 then 1 else 0 end
+	and t.session_id = r.session_id
 	group by case when r.session_id > 50 then 1 else 0 end
 	option (keep plan);
 
